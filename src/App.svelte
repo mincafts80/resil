@@ -6,34 +6,66 @@
   let queue = [];
   let isPlaying = false;
   let volume = 0.8;
+  let progress = 0; // seconds
+  let duration = 0; // seconds
+  let progressInterval;
 
-  // Dummy data (replace with real backend calls later)
   onMount(() => {
     queue = [
-      { title: "Track 1", duration: "3:45" },
-      { title: "Track 2", duration: "4:10" },
-      { title: "Track 3", duration: "2:58" }
+      { title: "Track 1", duration: 225 }, // seconds
+      { title: "Track 2", duration: 250 },
+      { title: "Track 3", duration: 178 }
     ];
   });
 
   async function play(track) {
     currentTrack = track;
     isPlaying = true;
+    progress = 0;
+    duration = track.duration;
+    startProgress();
     // backend call: await invoke("play_track", { path: track.path });
   }
 
   function togglePlay() {
     isPlaying = !isPlaying;
+    if (isPlaying) startProgress();
+    else clearInterval(progressInterval);
   }
 
   function stop() {
     isPlaying = false;
     currentTrack = null;
+    progress = 0;
+    duration = 0;
+    clearInterval(progressInterval);
   }
 
   function setVolume(v) {
     volume = v;
     // backend call: await invoke("set_volume", { value: v });
+  }
+
+  function startProgress() {
+    clearInterval(progressInterval);
+    progressInterval = setInterval(() => {
+      if (progress < duration && isPlaying) {
+        progress++;
+      } else {
+        clearInterval(progressInterval);
+      }
+    }, 1000);
+  }
+
+  function seek(newTime) {
+    progress = newTime;
+    // backend call: await invoke("seek", { time: newTime });
+  }
+
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
   }
 </script>
 
@@ -43,7 +75,23 @@
     <h1 class="text-xl font-bold mb-2">Now Playing</h1>
     {#if currentTrack}
       <p class="text-lg">{currentTrack.title}</p>
-      <p class="text-sm text-gray-400">{currentTrack.duration}</p>
+
+      <!-- Progress Bar -->
+      <div class="mt-4">
+        <input
+          type="range"
+          min="0"
+          max={duration}
+          step="1"
+          bind:value={progress}
+          on:change={(e) => seek(parseInt(e.target.value))}
+          class="w-full"
+        />
+        <div class="flex justify-between text-sm text-gray-400 mt-1">
+          <span>{formatTime(progress)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
     {:else}
       <p class="text-gray-500">Nothing playing</p>
     {/if}
@@ -53,6 +101,7 @@
       <button
         class="px-4 py-2 bg-blue-600 rounded-xl hover:bg-blue-500"
         on:click={togglePlay}
+        disabled={!currentTrack}
       >
         {isPlaying ? "Pause" : "Play"}
       </button>
@@ -89,7 +138,7 @@
             on:click={() => play(track)}
           >
             <span>{track.title}</span>
-            <span class="text-gray-400 text-sm">{track.duration}</span>
+            <span class="text-gray-400 text-sm">{formatTime(track.duration)}</span>
           </li>
         {/each}
       </ul>
@@ -98,14 +147,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  /* Custom scrollbar for queue */
-  .queue::-webkit-scrollbar {
-    width: 6px;
-  }
-  .queue::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 3px;
-  }
-</style>
